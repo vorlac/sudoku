@@ -30,8 +30,8 @@ class Sudoku:
         self.cells = list(product(self.rows, self.columns))
         # the sudoku grid of values
         # [len(self.columns) * [None]] * len(self.rows)
-        self.grid: dict[tuple[int, int], None | int] = {c: None for c in self.cells}
-        self.values: dict[tuple[int, int], list[int]] = {c: [] for c in self.cells}
+        self._grid: dict[tuple[int, int], None | int] = {c: None for c in self.cells}
+        self._values: dict[tuple[int, int], list[int]] = {c: [] for c in self.cells}
 
         # coordinates of all row groups in the grid
         self.row_groups = [list(product([row], self.columns)) for row in self.rows]
@@ -58,6 +58,9 @@ class Sudoku:
         }
 
     def __repr__(self):
+        return self.print_grid()
+
+    def print_grid(self):
         grid_str: list[str] = []
         cell_row_groups = groupby(self.cells, key=lambda cell: cell[0])
         for idx, (_, row) in enumerate(cell_row_groups):
@@ -68,7 +71,7 @@ class Sudoku:
                         iter(
                             [
                                 "".join(
-                                    str(self.grid[cell] if self.grid[cell] else ".")
+                                    str(self._grid[cell] if self._grid[cell] else ".")
                                 )
                                 for cell in row
                             ]
@@ -87,178 +90,137 @@ class Sudoku:
 
         return "\n" + "\n".join(grid_str) + "\n"
 
-    # def __str__(self):
-    #     grid_str: list[str] = []
-    #     cell_row_groups = groupby(self.cells, key=lambda cell: cell[0])
-    #     for idx, (_, row) in enumerate(cell_row_groups):
-    #         row_cell_list = [
-    #             " ".join(group)
-    #             for group in zip(
-    #                 *(iter(["".join(str(self.values[cell])) for cell in row]),) * 3
-    #             )
-    #         ]
-    #         row_cell_str = " | ".join(row_cell_list)
-    #         if grid_str and idx % 3 == 0:
-    #             grid_str.append(
-    #                 " + ".join([str("-" * int((len(row_cell_str) - 6) / 3))] * 3)
-    #             )
+    def print_values(self):
+        grid_str: list[str] = []
+        cell_row_groups = groupby(self.cells, key=lambda cell: cell[0])
+        for idx, (_, row) in enumerate(cell_row_groups):
+            row_cell_list = [
+                " ".join(group)
+                for group in zip(
+                    *(iter(["".join(str(self._values[cell])) for cell in row]),) * 3
+                )
+            ]
+            row_cell_str = " | ".join(row_cell_list)
+            if grid_str and idx % 3 == 0:
+                grid_str.append(
+                    " + ".join([str("-" * int((len(row_cell_str) - 6) / 3))] * 3)
+                )
 
-    #         grid_str.append(row_cell_str)
+            grid_str.append(row_cell_str)
 
-    #     return "\n" + "\n".join(grid_str) + "\n"
-
-    def _reset(self):
-        self.grid: dict[tuple[int, int], None | int] = {c: None for c in self.cells}
-        self.values: dict[tuple[int, int], list[int]] = {c: [] for c in self.cells}
-
-    def validate(self) -> bool:
-        assert len(self.cells) == 81
-        assert len(self.groupings) == 27
-        assert all(len(self.cell_groups[s]) == 3 for s in self.cells)
-        assert all(len(self.related_cells[s]) == 20 for s in self.cells)
-        return True
+        return "\n" + "\n".join(grid_str) + "\n"
 
     def _related_cell_values(self, cell: tuple[int, int]) -> list[int]:
         ret: list[int] = []
         for related_cell in self.related_cells[cell]:
-            val = self.grid[related_cell]
+            val = self._grid[related_cell]
             if val is not None:
                 ret.append(val)
 
         return ret
+
+    def _init_solution_values(self) -> bool:
+        for cell in self.cells:
+            grid_val = self._grid[cell]
+            if grid_val:
+                self._values[cell] = [grid_val]
+            else:
+                for num in self.digits:
+                    group_values = self._related_cell_values(cell)
+                    if num not in group_values:
+                        self._values[cell].append(num)
+        return True
 
     def _seed_puzzle_generation(self) -> bool:
         nums = sample(self.digits, len(self.digits))
         for n in nums:
             cells = sample(self.cells, len(self.cells))
             for cell in cells:
-                if self.grid[cell] is None:
-                    self.grid[cell] = n
+                if self._grid[cell] is None:
+                    self._grid[cell] = n
                     break
 
-        return True
+        return self._init_solution_values()
 
-    def generate(self) -> bool:
-        self._seed_puzzle_generation()
-        if not self.solve():
-            self._reset()
-            return False
-        return True
-
-    # def generate_puzzle2(self) -> bool:
-    #     # randomly iterate through all grid cells
-    #     cells = sample(self.cells, len(self.cells))
-    #     for count, cell in enumerate(cells):
-    #         # randomly iterate through all digits that couls be stored in each cell
-    #         nums = sample(self.digits, len(self.digits))
-    #         group_values = self._related_cell_values(cell)
-    #         for n in nums:
-    #             if n not in group_values:
-    #                 self.grid[cell] = n
-    #                 break
-
-    #         if self.grid[cell] is None:
-    #             print(self)
-    #             self._reset()
-    #             return False
-    #         elif count >= 9:
-    #             solved = self.solve()
-    #             if not solved:
-    #                 self._reset()
-    #             return solved
-
-    #     return True
-
-    def _init_solution_values(self) -> bool:
+    def _propagate_value_changes(self) -> bool:
         for cell in self.cells:
-            grid_val = self.grid[cell]
-            if grid_val:
-                self.values[cell].append(grid_val)
-            else:
-                for num in self.digits:
-                    group_values = self._related_cell_values(cell)
-                    if num not in group_values:
-                        self.values[cell].append(num)
-        return True
-
-    def propagate_value_changes(self) -> bool:
-        for cell in self.cells:
-            if len(self.values[cell]) == 1:
-                cell_value = self.values[cell][0]
+            if len(self._values[cell]) == 1:
+                cell_value = self._values[cell][0]
                 # remove the assigned value from all connected
                 # groups (row, col, box) related to the cell
                 for related_cell in self.related_cells[cell]:
-                    if cell_value in self.values[related_cell]:
-                        self.values[related_cell].remove(cell_value)
+                    if cell_value in self._values[related_cell]:
+                        self._values[related_cell].remove(cell_value)
+                        possible_cell_values = self._values[related_cell]
+                        # if there's only one digit value left for this
+                        # cell then it's safe to assign since there are
+                        # no other options for the cell being looked at
+                        if len(possible_cell_values) == 1:
+                            self._grid[related_cell] = possible_cell_values[0]
                         # if the last potential digit value was removed
                         # from this cell, the grid won't be solvable
-                        if len(self.values[related_cell]) == 0:
+                        elif len(self._values[related_cell]) == 0:
                             return False
 
         return True
 
-    def solve(self) -> bool:
-        self._init_solution_values()
+    def reset(self):
+        self._grid: dict[tuple[int, int], None | int] = {c: None for c in self.cells}
+        self._values: dict[tuple[int, int], list[int]] = {c: [] for c in self.cells}
 
+    def generate(self) -> bool:
+        self._seed_puzzle_generation()
+        if not self.solve():
+            self.reset()
+            return False
+        return True
+
+    def solve(self) -> bool:
         modified_grid_values = True
         while modified_grid_values:
             modified_grid_values = False
             # check each cell that still has more than one
             # potential value that could be assigned to it
             for cell in self.cells:
-                cell_value_candidates = self.values[cell]
+                cell_value_candidates = self._values[cell]
                 if len(cell_value_candidates) > 1:
                     # iterate through all possible values that haven't
                     # been eliminated for the current cell yet
                     for possible_value in cell_value_candidates:
                         # for each value, check it against all related cells
                         # in each of the three groups (row, col, box/region)
-                        related_cells = self.related_cells[cell]
-                        for rel_cell in related_cells:
-                            # if no other related cells contain the current cell's
-                            # potential value, then it's safe to assign the value
-                            # since we know it can't go anywhere else and isn't
-                            # already in one of the cell's related cell groups
-                            rel_cell_values = self._related_cell_values(rel_cell)
-                            if possible_value in rel_cell_values:
-                                continue
+                        rel_cell_values = self._related_cell_values(cell)
+                        if possible_value in rel_cell_values:
+                            continue
 
-                            self.values[cell] = [possible_value]
-                            self.propagate_value_changes()
-                            modified_grid_values = True
-                            #####################################
-                            #####################################
-                            print(self)
-                            self.grid[cell] = possible_value  ###
-                            print(self)
-                            #####################################
-                            #####################################
-                            # break
+                        # if no other related cells contain the current cell's
+                        # potential value, then it's safe to assign the value
+                        # since we know it can't go anywhere else and isn't
+                        # already in one of the cell's related cell groups
+                        self._grid[cell] = possible_value
+                        self._values[cell] = [possible_value]
+                        self._propagate_value_changes()
+                        modified_grid_values = True
+                        break
 
         for cell in self.cells:
-            cell_value_candidates = self.values[cell]
+            cell_value_candidates = self._values[cell]
             if len(cell_value_candidates) != 1:
-                print(self)
                 return False
 
         return True
 
 
 def main():
+    generated = 0
     sudoku = Sudoku()
-    if sudoku.validate():
-        attempts = 0
-        generated = False
-        while not generated:
-            generated = sudoku.generate()
-            if attempts % 50 == 0:
-                print(attempts, end="    \r")
-
-            attempts += 1
-            if generated:
-                print(sudoku)
-                break
-    return True
+    while True:
+        if sudoku.generate():
+            generated += 1
+            print(generated, end="    \r")
+            with open("puzzles.txt", "a") as fh:
+                fh.write(str(sudoku))
+                sudoku.reset()
 
 
 if __name__ == "__main__":
