@@ -218,21 +218,26 @@ def main():
 
     sudoku = Sudoku()
 
-    while generated < limit:
-        valid, grid = sudoku.generate()
-        if valid:
-            generated += 1
-            print("\n")
-            print(f"=================================")
-            print(f"== Sudoku Grid [{generated:0>3}] generated ==")
-            print(f"=================================")
-            print(f"\n[pre-solved grid]\n")
-            print(grid)
-            print(f"[solution]\n")
-            print(sudoku.print_grid())
+    with open("puzzles.txt", "w") as fh:
+        while generated < limit:
+            valid, grid = sudoku.generate()
+            if valid:
+                generated += 1
 
-            with open("puzzles.txt", "a") as fh:
-                fh.write(str(sudoku))
+                print("\n")
+                print(f"=================================")
+                print(f"== Sudoku Grid [{generated:0>3}] generated ==")
+                print(f"=================================")
+                print(f"\n[pre-solved grid]\n")
+                print(grid)
+                print(f"[solution]\n")
+                print(sudoku.print_grid())
+
+                fh.write(f"\n[{generated:0>3}]\n")
+                fh.write(grid + "\n")
+                fh.write(f"\t=====================\n\n")
+                fh.write(sudoku.print_grid())
+
                 sudoku.reset()
 
 
