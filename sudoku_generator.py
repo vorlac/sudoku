@@ -88,7 +88,7 @@ class Sudoku:
 
             grid_str.append(row_cell_str)
 
-        return "\n" + "\n".join(grid_str) + "\n"
+        return "\t" + "\n\t".join(grid_str) + "\n"
 
     def print_values(self):
         grid_str: list[str] = []
@@ -168,12 +168,13 @@ class Sudoku:
         self._grid: dict[tuple[int, int], None | int] = {c: None for c in self.cells}
         self._values: dict[tuple[int, int], list[int]] = {c: [] for c in self.cells}
 
-    def generate(self) -> bool:
+    def generate(self) -> tuple[bool, str]:
         self._seed_puzzle_generation()
+        before_solve = self.print_grid()
         if not self.solve():
             self.reset()
-            return False
-        return True
+            return False, ""
+        return True, before_solve
 
     def solve(self) -> bool:
         modified_grid_values = True
@@ -212,12 +213,24 @@ class Sudoku:
 
 
 def main():
+    limit = 100
     generated = 0
+
     sudoku = Sudoku()
-    while True:
-        if sudoku.generate():
+
+    while generated < limit:
+        valid, grid = sudoku.generate()
+        if valid:
             generated += 1
-            print(generated, end="    \r")
+            print("\n")
+            print(f"=================================")
+            print(f"== Sudoku Grid [{generated:0>3}] generated ==")
+            print(f"=================================")
+            print(f"\n[pre-solved grid]\n")
+            print(grid)
+            print(f"[solution]\n")
+            print(sudoku.print_grid())
+
             with open("puzzles.txt", "a") as fh:
                 fh.write(str(sudoku))
                 sudoku.reset()
